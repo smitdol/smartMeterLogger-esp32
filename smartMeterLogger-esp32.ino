@@ -1,5 +1,5 @@
 #include <SD.h>
-#include <FS.h>
+//#include <FS.h>
 #include <driver/uart.h>
 #include <AsyncTCP.h>          /* https://github.com/me-no-dev/AsyncTCP */
 #include <ESPAsyncWebServer.h> /* https://github.com/me-no-dev/ESPAsyncWebServer */
@@ -35,7 +35,11 @@ SSD1306 oled(OLED_ADDRESS, I2C_SDA_PIN, I2C_SCL_PIN);
 #endif
 
 time_t bootTime;
-bool oledFound{ false };
+bool oledFound{false};
+static uint8_t xOrigin;
+static uint8_t yOrigin;
+static uint8_t yOffset;
+static char buffer[17];
 
 const char* HEADER_MODIFIED_SINCE = "If-Modified-Since";
 
@@ -74,10 +78,12 @@ void updateFileHandlers(const tm& now) {
 
 void setup() {
     Serial.begin(115200);
-    Serial.printf("\n\nsmartMeterLogger-esp32\n\nconnecting to %s...\n", WIFI_NETWORK);
+    Serial.println("smartMeterLogger-esp32");
 
     if (!SD.begin())
         Serial.println("SD card mount failed");
+    else
+        Serial.println("SD card mounted");
 
     /* check if oled display is present */
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
@@ -86,20 +92,34 @@ void setup() {
     if (error)
         Serial.println("no SSD1306/SH1106 oled found.");
     else {
+        Serial.println("SSD1306/SH1106 oled found.");
         oledFound = true;
         oled.init();
         oled.flipScreenVertically();
         oled.setContrast(10, 5, 0);
-        oled.setTextAlignment(TEXT_ALIGN_CENTER);
-        oled.setFont(ArialMT_Plain_16);
-        oled.drawString(oled.width() >> 1, 0, "Connecting..");
+        oled.setFont(ArialMT_Plain_10);
+        /*
+         * Note: You should know the Grove - OLED Display 0.66" (SSD1306) screen is based on the 128×64 resolution screen. 
+         * When you want to display by U8g2 SSD 128*64 drive, you may need to start the point at (31,16) instead of (0,0). 
+         * The range is from (31,16) to (95,63).
+         */
+        xOrigin=31;
+        yOrigin=16;
+        yOffset=16;
+        oled.drawString(xOrigin, yOrigin, "Connecting..");
         oled.display();
+        Serial.printf("oled.width %i\n", oled.width());
     }
 
-    /* try to set a static IP */
-    if (SET_STATIC_IP && !WiFi.config(STATIC_IP, GATEWAY, SUBNET, PRIMARY_DNS, SECONDARY_DNS))
-        Serial.println("Setting static IP failed");
+    sprintf(buffer, "%s", STATIC_IP.toString().c_str());
 
+    Serial.printf("try to set static IP %s\n", buffer);
+    if (SET_STATIC_IP && !WiFi.config(STATIC_IP, GATEWAY, SUBNET, PRIMARY_DNS, SECONDARY_DNS))
+        Serial.printf("Setting static IP %s failed\n", buffer);
+    else
+        Serial.printf("Setting static IP %s succeeded\n", buffer);
+
+    Serial.printf("connecting to %s...\n", WIFI_NETWORK);
     WiFi.begin(WIFI_NETWORK, WIFI_PASSWORD);
     WiFi.setSleep(false);
     WiFi.setAutoReconnect(true);
@@ -110,8 +130,8 @@ void setup() {
 
     if (oledFound) {
         oled.clear();
-        oled.drawString(oled.width() >> 1, 0, WiFi.localIP().toString());
-        oled.drawString(oled.width() >> 1, 25, "Syncing NTP...");
+        oled.drawString(xOrigin, yOrigin, WiFi.localIP().toString());
+        oled.drawString(xOrigin, yOrigin+yOffset, "Syncing NTP...");
         oled.display();
     }
     Serial.println("syncing NTP");
@@ -242,8 +262,11 @@ static uint32_t numberOfSamples{ 0 };
 struct {
     uint32_t low;
     uint32_t high;
+    uint32_t rlow;
+    uint32_t rhigh;
     uint32_t gas;
-} current;
+    uint32_t voltage;
+} currentDTO;
 
 void saveAverage(const tm& timeinfo) {
     const String message{
@@ -272,7 +295,7 @@ void saveAverage(const tm& timeinfo) {
 
     if (booted || !SD.exists(path)) {
         const String startHeader{
-            "#" + String(bootTime) + " " + current.low + " " + current.high + " " + current.gas
+            "#" + String(bootTime) + " " + currentDTO.low + " " + currentDTO.high + " " + currentDTO.gas + " " + currentDTO.rlow + " " + currentDTO.rhigh + " " + currentDTO.voltage
         };
 
         log_d("writing start header '%s' to '%s'", startHeader.c_str(), path.c_str());
@@ -314,25 +337,23 @@ void loop() {
             ws_bridge.disconnect();
             lastMessageMs = millis();
         }
-    } else {
-        if (smartMeter.available()) {
-            static const auto BUFFERSIZE = 1024;
-            static char telegram[BUFFERSIZE];
-
-            const unsigned long START_MS = millis();
-            static const auto TIMEOUT_MS = 100;
-            int size = 0;
-            auto bytes = smartMeter.available();
-
-            while (millis() - START_MS < TIMEOUT_MS && size + bytes < BUFFERSIZE) {
-                size += bytes ? smartMeter.read(telegram + size, bytes) : 0;
-                delay(5);
-                bytes = smartMeter.available();
-            }
-
-            log_d("telegram received - %i bytes:\n%s", size, telegram);
-            process(telegram, size);
+    } else if (smartMeter.available()) {
+        static const auto BUFFERSIZE = 1024;
+        static char telegram[BUFFERSIZE];
+        
+        const unsigned long START_MS = millis();
+        static const auto TIMEOUT_MS = 100;
+        int size = 0;
+        auto bytes = smartMeter.available();
+        
+        while (millis() - START_MS < TIMEOUT_MS && size + bytes < BUFFERSIZE) {
+            size += bytes ? smartMeter.read(telegram + size, bytes) : 0;
+            delay(5);
+            bytes = smartMeter.available();
         }
+        
+        log_d("telegram received - %i bytes:\n%s", size, telegram);
+        process(telegram, size);
     }
     delay(1);
 }
@@ -430,9 +451,13 @@ void process(const char* telegram, const int size) {
     using decodedFields = ParsedData<
         /* FixedValue */ energy_delivered_tariff1,
         /* FixedValue */ energy_delivered_tariff2,
+        /* FixedValue */ energy_returned_tariff1,
+        /* FixedValue */ energy_returned_tariff2,
         /* String */ electricity_tariff,
         /* FixedValue */ power_delivered,
-        /* TimestampedFixedValue */ gas_delivered >;
+        /* FixedValue */ power_returned,
+        /* TimestampedFixedValue */ gas_delivered,
+        /* FixedValue */ voltage_l1>;
     decodedFields data;
     const ParseResult<void> res = P1Parser::parse(&data, telegram, size);
     /*
@@ -450,12 +475,17 @@ void process(const char* telegram, const int size) {
     static struct {
         uint32_t t1Start;
         uint32_t t2Start;
+        uint32_t r1Start;
+        uint32_t r2Start;
         uint32_t gasStart;
     } today;
 
-    current = { data.energy_delivered_tariff1.int_val(),
+    currentDTO = { data.energy_delivered_tariff1.int_val(),
                 data.energy_delivered_tariff2.int_val(),
-                data.gas_delivered.int_val() };
+                data.energy_returned_tariff1.int_val(),
+                data.energy_returned_tariff2.int_val(),
+                data.gas_delivered.int_val(),
+                data.voltage_l1.int_val()};
 
     /* out of range value to make sure the next check updates the first time */
     static uint8_t currentMonthDay{ 40 };
@@ -467,6 +497,8 @@ void process(const char* telegram, const int size) {
     if (currentMonthDay != timeinfo.tm_mday) {
         today.t1Start = data.energy_delivered_tariff1.int_val();
         today.t2Start = data.energy_delivered_tariff2.int_val();
+        today.r1Start = data.energy_returned_tariff1.int_val();
+        today.r2Start = data.energy_returned_tariff2.int_val();
         today.gasStart = data.gas_delivered.int_val();
         currentMonthDay = timeinfo.tm_mday;
     }
@@ -474,13 +506,17 @@ void process(const char* telegram, const int size) {
     average += data.power_delivered.int_val();
     numberOfSamples++;
 
-    snprintf(currentUseString, sizeof(currentUseString), "current\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%s",
+    snprintf(currentUseString, sizeof(currentUseString), "current\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%s",
              data.power_delivered.int_val(),
              data.energy_delivered_tariff1.int_val(),
              data.energy_delivered_tariff2.int_val(),
+             data.energy_returned_tariff1.int_val(),
+             data.energy_returned_tariff2.int_val(),
              data.gas_delivered.int_val(),
              data.energy_delivered_tariff1.int_val() - today.t1Start,
              data.energy_delivered_tariff2.int_val() - today.t2Start,
+             data.energy_returned_tariff1.int_val() - today.r1Start,
+             data.energy_returned_tariff2.int_val() - today.r2Start,
              data.gas_delivered.int_val() - today.gasStart,
              (data.electricity_tariff.equals("0001")) ? "laag" : "hoog");
 
@@ -489,9 +525,34 @@ void process(const char* telegram, const int size) {
     if (oledFound) {
         oled.clear();
         oled.setFont(ArialMT_Plain_16);
-        oled.drawString(oled.width() >> 1, 0, WiFi.localIP().toString());
-        oled.setFont(ArialMT_Plain_24);
-        oled.drawString(oled.width() >> 1, 18, String(data.power_delivered.int_val()) + "W");
+        if (timeinfo.tm_sec < 10) {
+            oled.drawString(xOrigin, yOrigin, "in lo");
+            oled.drawString(xOrigin, yOrigin+yOffset, String(data.energy_delivered_tariff1.int_val()));
+        } else if (timeinfo.tm_sec < 20) {
+            oled.drawString(xOrigin, yOrigin, "in hi");
+            oled.drawString(xOrigin, yOrigin+yOffset, String(data.energy_delivered_tariff2.int_val()));
+        } else if (timeinfo.tm_sec < 30) {
+            oled.drawString(xOrigin, yOrigin, "out lo");
+            oled.drawString(xOrigin, yOrigin+yOffset, String(data.energy_returned_tariff1.int_val()));
+        } else if (timeinfo.tm_sec < 40) {
+            oled.drawString(xOrigin, yOrigin, "out hi");
+            oled.drawString(xOrigin, yOrigin+yOffset, String(data.energy_returned_tariff2.int_val()));
+        } else if (timeinfo.tm_sec < 50) {
+            oled.setFont(ArialMT_Plain_10);
+            oled.drawString(xOrigin, yOrigin, WiFi.localIP().toString());
+            oled.setFont(ArialMT_Plain_16);
+            oled.drawString(xOrigin, yOrigin+yOffset, String(data.power_delivered.int_val()) + "W");
+        } else if (timeinfo.tm_sec < 55) {
+            oled.setFont(ArialMT_Plain_10);
+            oled.drawString(xOrigin, yOrigin, WiFi.localIP().toString());
+            oled.setFont(ArialMT_Plain_16);
+            oled.drawString(xOrigin, yOrigin+yOffset, String(data.voltage_l1.int_val()) + "V");
+        } else {
+            strftime(buffer,sizeof(buffer),"%y-%m-%d",&timeinfo);
+            oled.drawString(xOrigin, yOrigin, buffer);
+            strftime(buffer,sizeof(buffer),"%H:%M:%S",&timeinfo);
+            oled.drawString(xOrigin, yOrigin+yOffset, buffer);
+        }
         oled.display();
     }
 }
