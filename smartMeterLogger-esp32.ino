@@ -123,6 +123,7 @@ void setup() {
         Serial.printf("Setting static IP %s succeeded\n", buffer);
 
     Serial.printf("connecting to %s...\n", WIFI_NETWORK);
+    WiFi.setHostname("SmartMeter");    
     WiFi.begin(WIFI_NETWORK, WIFI_PASSWORD);
     WiFi.setSleep(false);
     WiFi.setAutoReconnect(true);
@@ -519,12 +520,12 @@ void process(const char* telegram, const int size) {
              data.energy_delivered_tariff1.int_val() - today.t1Start,
              data.energy_delivered_tariff2.int_val() - today.t2Start,
              data.gas_delivered.int_val() - today.gasStart,
-             (data.electricity_tariff.equals("0001")) ? "laag" : "hoog");
-
+             (data.electricity_tariff.equals("0001")) ? "laag" : "hoog",
              data.energy_returned_tariff1.int_val(),
              data.energy_returned_tariff2.int_val(),
              data.energy_returned_tariff1.int_val() - today.r1Start,
-             data.energy_returned_tariff2.int_val() - today.r2Start,
+             data.energy_returned_tariff2.int_val() - today.r2Start
+             );
 
     ws_server_events.textAll(currentUseString);
 
