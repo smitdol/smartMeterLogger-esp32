@@ -1,3 +1,6 @@
+/*
+ * BOARD TTGO T7 V1.3  mini32
+ */
 #include <SD.h>
 //#include <FS.h>
 #include <driver/uart.h>
@@ -293,10 +296,10 @@ void saveAverage(const tm& timeinfo) {
 
     static bool booted{ true };
 
+    const String current { String(currentDTO.low) + " " + currentDTO.high + " " + currentDTO.gas + " " + currentDTO.rlow + " " + currentDTO.rhigh + " " + currentDTO.voltage};
+
     if (booted || !SD.exists(path)) {
-        const String startHeader{
-            "#" + String(bootTime) + " " + currentDTO.low + " " + currentDTO.high + " " + currentDTO.gas + " " + currentDTO.rlow + " " + currentDTO.rhigh + " " + currentDTO.voltage
-        };
+        const String startHeader{ "#" + String(bootTime) + " " + current };
 
         log_d("writing start header '%s' to '%s'", startHeader.c_str(), path.c_str());
 
@@ -306,7 +309,9 @@ void saveAverage(const tm& timeinfo) {
 
     log_d("%i samples - saving '%s' to file '%s'", numberOfSamples, message.c_str(), path.c_str());
 
-    appendToFile(path.c_str(), message.c_str());
+    const String msg { message + " " + current };
+
+    appendToFile(path.c_str(), msg.c_str());
 
     average = 0;
     numberOfSamples = 0;
