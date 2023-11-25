@@ -511,19 +511,20 @@ void process(const char* telegram, const int size) {
     average += data.power_delivered.int_val();
     numberOfSamples++;
 
-    snprintf(currentUseString, sizeof(currentUseString), "current\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%s",
+    snprintf(currentUseString, sizeof(currentUseString), "current\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%s\n%i\n%i\n%i\n%i",
              data.power_delivered.int_val(),
              data.energy_delivered_tariff1.int_val(),
              data.energy_delivered_tariff2.int_val(),
-             data.energy_returned_tariff1.int_val(),
-             data.energy_returned_tariff2.int_val(),
              data.gas_delivered.int_val(),
              data.energy_delivered_tariff1.int_val() - today.t1Start,
              data.energy_delivered_tariff2.int_val() - today.t2Start,
-             data.energy_returned_tariff1.int_val() - today.r1Start,
-             data.energy_returned_tariff2.int_val() - today.r2Start,
              data.gas_delivered.int_val() - today.gasStart,
              (data.electricity_tariff.equals("0001")) ? "laag" : "hoog");
+
+             data.energy_returned_tariff1.int_val(),
+             data.energy_returned_tariff2.int_val(),
+             data.energy_returned_tariff1.int_val() - today.r1Start,
+             data.energy_returned_tariff2.int_val() - today.r2Start,
 
     ws_server_events.textAll(currentUseString);
 
