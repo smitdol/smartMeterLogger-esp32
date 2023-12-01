@@ -148,6 +148,16 @@ void setup() {
     while (!getLocalTime(&now, 0))
         delay(10);
 
+    if (oledFound) {
+        oled.clear();
+        oled.setFont(ArialMT_Plain_16);
+        strftime(buffer,sizeof(buffer),"%y-%m-%d",&now);
+        oled.drawString(xOrigin, yOrigin, buffer);
+        strftime(buffer,sizeof(buffer),"%H:%M:%S",&now);
+        oled.drawString(xOrigin, yOrigin+yOffset, buffer);
+        oled.display();
+    }
+
     /* websocket setup */
     ws_server_raw.onEvent(ws_server_onEvent);
     http_server.addHandler(&ws_server_raw);
@@ -155,8 +165,10 @@ void setup() {
     ws_server_events.onEvent(ws_server_onEvent);
     http_server.addHandler(&ws_server_events);
 
+
     /* webserver setup */
     time(&bootTime);
+
     static char modifiedDate[30];
     strftime(modifiedDate, sizeof(modifiedDate), "%a, %d %b %Y %X GMT", gmtime(&bootTime));
 
@@ -532,27 +544,24 @@ void process(const char* telegram, const int size) {
     if (oledFound) {
         oled.clear();
         oled.setFont(ArialMT_Plain_16);
-        if (timeinfo.tm_sec < 10) {
+        if (timeinfo.tm_sec < 9) {
             oled.drawString(xOrigin, yOrigin, "in lo");
             oled.drawString(xOrigin, yOrigin+yOffset, String(data.energy_delivered_tariff1.int_val()));
-        } else if (timeinfo.tm_sec < 20) {
+        } else if (timeinfo.tm_sec < 18) {
             oled.drawString(xOrigin, yOrigin, "in hi");
             oled.drawString(xOrigin, yOrigin+yOffset, String(data.energy_delivered_tariff2.int_val()));
-        } else if (timeinfo.tm_sec < 30) {
+        } else if (timeinfo.tm_sec < 27) {
             oled.drawString(xOrigin, yOrigin, "out lo");
             oled.drawString(xOrigin, yOrigin+yOffset, String(data.energy_returned_tariff1.int_val()));
-        } else if (timeinfo.tm_sec < 40) {
+        } else if (timeinfo.tm_sec < 36) {
             oled.drawString(xOrigin, yOrigin, "out hi");
             oled.drawString(xOrigin, yOrigin+yOffset, String(data.energy_returned_tariff2.int_val()));
-        } else if (timeinfo.tm_sec < 50) {
-            oled.setFont(ArialMT_Plain_10);
-            oled.drawString(xOrigin, yOrigin, WiFi.localIP().toString());
-            oled.setFont(ArialMT_Plain_16);
-            oled.drawString(xOrigin, yOrigin+yOffset, String(data.power_delivered.int_val()) + "W");
-        } else if (timeinfo.tm_sec < 55) {
-            oled.setFont(ArialMT_Plain_10);
-            oled.drawString(xOrigin, yOrigin, WiFi.localIP().toString());
-            oled.setFont(ArialMT_Plain_16);
+        } else if (timeinfo.tm_sec < 45) {
+            oled.drawString(xOrigin, yOrigin, "gas");
+            oled.drawString(xOrigin, yOrigin+yOffset, String(data.gas_delivered.int_val()));
+        } else if (timeinfo.tm_sec < 54) {
+          //46..54; 8 characters fit 192.168,xxx,yyy, The range is from (31,16) to (95,63). = 64, 1 ch = 8 x
+            oled.drawString(xOrigin+8*(46-timeinfo.tm_sec), yOrigin, WiFi.localIP().toString());
             oled.drawString(xOrigin, yOrigin+yOffset, String(data.voltage_l1.int_val()) + "V");
         } else {
             strftime(buffer,sizeof(buffer),"%y-%m-%d",&timeinfo);
@@ -560,6 +569,8 @@ void process(const char* telegram, const int size) {
             strftime(buffer,sizeof(buffer),"%H:%M:%S",&timeinfo);
             oled.drawString(xOrigin, yOrigin+yOffset, buffer);
         }
+        oled.setFont(ArialMT_Plain_16);
+        oled.drawString(xOrigin, yOrigin+yOffset+yOffset, String(data.power_delivered.int_val()) + "W");
         oled.display();
     }
 }
