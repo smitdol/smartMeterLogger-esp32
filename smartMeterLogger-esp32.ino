@@ -524,7 +524,7 @@ void process(const char* telegram, const int size) {
     average += data.power_delivered.int_val();
     numberOfSamples++;
 
-    snprintf(currentUseString, sizeof(currentUseString), "current\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%s\n%i\n%i\n%i\n%i",
+    snprintf(currentUseString, sizeof(currentUseString), "current\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%s\n%i\n%i\n%i\n%i\n%i",
              data.power_delivered.int_val(),
              data.energy_delivered_tariff1.int_val(),
              data.energy_delivered_tariff2.int_val(),
@@ -536,7 +536,8 @@ void process(const char* telegram, const int size) {
              data.energy_returned_tariff1.int_val(),
              data.energy_returned_tariff2.int_val(),
              data.energy_returned_tariff1.int_val() - today.r1Start,
-             data.energy_returned_tariff2.int_val() - today.r2Start
+             data.energy_returned_tariff2.int_val() - today.r2Start,
+             data.power_returned.int_val()
              );
 
     ws_server_events.textAll(currentUseString);
@@ -569,8 +570,14 @@ void process(const char* telegram, const int size) {
             strftime(buffer,sizeof(buffer),"%H:%M:%S",&timeinfo);
             oled.drawString(xOrigin, yOrigin+yOffset, buffer);
         }
+        uint32_t delivered = data.power_delivered.int_val();
+        uint32_t returned = data.power_returned.int_val();
         oled.setFont(ArialMT_Plain_16);
-        oled.drawString(xOrigin, yOrigin+yOffset+yOffset, String(data.power_delivered.int_val()) + "W");
+        if (delivered > returned) {
+        oled.drawString(xOrigin, yOrigin+yOffset+yOffset, String(delivered - returned) + "W");
+        } else {
+        oled.drawString(xOrigin, yOrigin+yOffset+yOffset, "-" +String(returned - delivered) + "W");
+        }
         oled.display();
     }
 }

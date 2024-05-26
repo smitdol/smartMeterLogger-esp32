@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <script>
-const debugip="192.168.0.90";  //change this to the esp32 ip for remote running of this page
+const debugip="192.168.189.47";  //change this to the esp32 ip for remote running of this page
 </script>
 <meta charset="utf-8">
 <meta name="viewport" content="minimal-ui,width=device-width,initial-scale=1.0,user-scalable=no" />
@@ -71,10 +71,21 @@ a{
   display:inline-block;
   margin:2px 5px;
 }
-.name{
+.name3, .value3{
+  width:18%;
+  display:inline-block;
+  margin:2px 5px;
+}
+.kWh{
+  width:8%;
+  display:inline-block;
+  margin:2px 5px;
+  text-align:left;
+}
+.name, name3{
   text-align:right;
 }
-.value{
+.value,value3{
   text-align:left;
 }
 </style>
@@ -90,17 +101,52 @@ a{
 </div>
 <p class="info">vandaag</p>
 <div class="container">
-  <p class="name">electra laag:</p><p id="lowToday" class="value"></p>
-  <p class="name">electra hoog:</p><p id="highToday" class="value"></p>
-  <p class="name">totaal:</p><p id="total_tUse" class="value"></p>
+  <p class="name3">electra</p>
+<p class="value3">verbruik</p>
+<p class="value3">levering</p>
+<p class="value3">balance</p>
+<p class="kWh">&nbsp;</p>
+  <p class="name3">laag:</p>
+<p id="lowToday" class="value3"></p>
+<p id="lowrToday" class="value3"></p>
+<p id="balanceLowToday" class="value3"></p>
+<p class="kWh">kWh</p>
+  <p class="name3">hoog:</p>
+<p id="highToday" class="value3"></p>
+<p id="highrToday" class="value3"></p>
+<p id="balanceHighToday" class="value3"></p>
+<p class="kWh">kWh</p>
+  <p class="name3">totaal:</p>
+<p id="total_tUse" class="value3">
+</p><p id="total_rToday" class="value3"></p>
+<p id="balanceToday" class="value3"></p>
+<p class="kWh">kWh</p>
   <p class="name">gas:</p><p id="gasToday" class="value"></p>
 </div>
 <p class="info">totaal</p>
 <div class="container">
-  <p class="name">electra laag:</p><p id="lowUse" class="value"></p>
-  <p class="name">electra hoog:</p><p id="highUse" class="value"></p>
-  <p class="name">totaal:</p><p id="total_eUse" class="value"></p>
-  <p class="name">gas:</p><p id="gasUse" class="value"></p>
+  <p class="name3">electra</p>
+<p class="value3">verbruik</p>
+<p class="value3">levering</p>
+<p class="value3">balance</p>
+<p class="kWh">&nbsp;</p>
+  <p class="name3">laag:</p>
+<p id="lowUse" class="value3"></p>
+<p id="lowrUse" class="value3"></p>
+<p id="balanceLow" class="value3"></p>
+<p class="kWh">kWh</p>
+  <p class="name3">hoog:</p>
+<p id="highUse" class="value3"></p>
+<p id="highrUse" class="value3"></p>
+<p id="balanceHigh" class="value3"></p>
+<p class="kWh">kWh</p>
+  <p class="name3">totaal:</p>
+<p id="total_eUse" class="value3"></p>
+<p id="total_rUse" class="value3"></p>
+<p id="balance" class="value3"></p>
+<p class="kWh">kWh</p>
+  <p class="name">gas:</p>
+<p id="gasUse" class="value"></p>
 </div>
 <script>
 const http_protocol = window.location.protocol !== 'https:' ? 'http://' : 'https://';
@@ -118,17 +164,35 @@ ready(event => {
   var ws = new ReconnectingWebSocket(ws_host, null, {debug:false, reconnectInterval:3500});
   ws.onmessage = function(e){
     if (!e.data.startsWith('current\n')) return;
+    console.log(e.data);
     var dsmr = e.data.substring(e.data.indexOf('\n') + 1).split('\n');
-    document.getElementById('currentUse').innerHTML = dsmr[0] + " W";
-    document.getElementById('lowUse').innerHTML = (dsmr[1] / 1000.0).toFixed(1).replace(".", ",") + ' kWh';
-    document.getElementById('highUse').innerHTML = (dsmr[2] / 1000.0).toFixed(1).replace(".", ",") + ' kWh';
-    document.getElementById('lowToday').innerHTML = (dsmr[4] / 1000.0).toFixed(3).replace(".", ",") + ' kWh';
-    document.getElementById('highToday').innerHTML = (dsmr[5] / 1000.0).toFixed(3).replace(".", ",") + ' kWh';
-    document.getElementById('gasUse').innerHTML = (dsmr[3] / 1000.0).toFixed(1).replace(".", ",") + ' m³';
-    document.getElementById('gasToday').innerHTML = (dsmr[6] / 1000.0).toFixed(3).replace(".", ",") + ' m³';
-    document.getElementById('tariff').innerHTML = dsmr[7];
-    document.getElementById('total_eUse').innerHTML = ((dsmr[1] / 1000.0 + dsmr[2] / 1000.0)).toFixed(1).replace(".", ",") + ' kWh';
-    document.getElementById('total_tUse').innerHTML = ((dsmr[4] / 1000.0 + dsmr[5] / 1000.0)).toFixed(3).replace(".", ",") + ' kWh';
+    if (dsmr.length > 12) {
+       document.getElementById('currentUse').innerHTML   = ((dsmr[0] - dsmr[12])).toFixed(0).replace(".", ",") + " W";
+    } else {
+        document.getElementById('currentUse').innerHTML   = dsmr[0] + " W";
+    }
+    document.getElementById('lowUse').innerHTML       =  (dsmr[1] / 1000.0).toFixed(1).replace(".", ",") ;
+    document.getElementById('highUse').innerHTML      =  (dsmr[2] / 1000.0).toFixed(1).replace(".", ",") ;
+    document.getElementById('gasUse').innerHTML       =  (dsmr[3] / 1000.0).toFixed(1).replace(".", ",") + ' m³';
+    document.getElementById('lowToday').innerHTML     =  (dsmr[4] / 1000.0).toFixed(3).replace(".", ",") ;
+    document.getElementById('highToday').innerHTML    =  (dsmr[5] / 1000.0).toFixed(3).replace(".", ",") ;
+    document.getElementById('gasToday').innerHTML     =  (dsmr[6] / 1000.0).toFixed(3).replace(".", ",") + ' m³';
+    document.getElementById('tariff').innerHTML       =   dsmr[7];
+    document.getElementById('total_eUse').innerHTML   = ((dsmr[1] / 1000.0 + dsmr[2] / 1000.0 )).toFixed(1).replace(".", ",") ;
+    document.getElementById('total_tUse').innerHTML   = ((dsmr[4] / 1000.0 + dsmr[5] / 1000.0 )).toFixed(3).replace(".", ",") ;
+
+    document.getElementById('lowrUse').innerHTML      =  (dsmr[8]  / 1000.0).toFixed(1).replace(".", ",") ;
+    document.getElementById('highrUse').innerHTML     =  (dsmr[9]  / 1000.0).toFixed(1).replace(".", ",") ;
+    document.getElementById('lowrToday').innerHTML    =  (dsmr[10] / 1000.0).toFixed(3).replace(".", ",") ;
+    document.getElementById('highrToday').innerHTML   =  (dsmr[11] / 1000.0).toFixed(3).replace(".", ",") ;
+    document.getElementById('total_rToday').innerHTML = ((dsmr[10] / 1000.0 + dsmr[11] / 1000.0 )).toFixed(3).replace(".", ",") ;
+    document.getElementById('total_rUse').innerHTML   = ((dsmr[8] / 1000.0 + dsmr[9] / 1000.0 )).toFixed(1).replace(".", ",") ;
+    document.getElementById('balanceLow').innerHTML   = ((dsmr[1] / 1000.0 - dsmr[8] / 1000.0 )).toFixed(1).replace(".", ",") ;
+    document.getElementById('balanceHigh').innerHTML   = ((dsmr[2] / 1000.0 - dsmr[9] /1000.0 )).toFixed(1).replace(".", ",") ;
+    document.getElementById('balance').innerHTML   = ((dsmr[1] / 1000.0 + dsmr[2] / 1000.0 - dsmr[8] / 1000.0 - dsmr[9] / 1000.0 )).toFixed(1).replace(".", ",") ;
+    document.getElementById('balanceLowToday').innerHTML   = ((dsmr[4] / 1000.0 - dsmr[10] / 1000.0 )).toFixed(3).replace(".", ",") ;
+    document.getElementById('balanceHighToday').innerHTML   = ((dsmr[5] / 1000.0 - dsmr[11] / 1000.0 )).toFixed(3).replace(".", ",");
+    document.getElementById('balanceToday').innerHTML   = ((dsmr[4] / 1000.0 + dsmr[5] / 1000.0 - dsmr[10] / 1000.0 - dsmr[11] / 1000.0 )).toFixed(3).replace(".", ",") ;
   };
   ws.onopen = function(){console.log('[WebSocket] Connected to ' + ws_host);}
   ws.onclose = function(event){console.log('[WebSocket] Connection died, code='  + event.code + ' reason=' + event.reason);}
