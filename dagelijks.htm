@@ -330,7 +330,6 @@ function map(x,in_min,in_max,out_min,out_max){
 
 function setRange(newrange){
   currentRange = newrange;
-  drawBackground();
   drawGraph(savedData, false);
   drawGraph(savedCompareData, true);
 }
@@ -469,7 +468,11 @@ ready(event => {
   ws.onmessage = function(e){
     if (e.data.startsWith('current\n')) {
       const use = e.data.substring(e.data.indexOf('\n') + 1).split('\n');
-      document.getElementById('currentuse').innerHTML = '<p class="currenttext">huidig verbruik</p>' + use[0] + '<span id="smallunit"> w</span>';
+      if (use.length > 12){
+        document.getElementById('currentuse').innerHTML = '<p class="currenttext">huidig verbruik</p>' + ((use[0] - use[12])).toFixed(0).replace(".", ",") + '<span id="smallunit"> w</span>';
+      } else {
+        document.getElementById('currentuse').innerHTML = '<p class="currenttext">huidig verbruik</p>' + use[0] + '<span id="smallunit"> w</span>';
+      }
     }
     else if (e.data.startsWith('electric_saved\n')) {
       if (currentDayEqualsToday()) {
@@ -580,7 +583,6 @@ ready(event => {
 
   document.getElementById('currentdate').innerHTML = new Date().toLocaleDateString('nl-NL', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour12: false});
 
-  drawBackground();
   currentDay = new Date();
   document.getElementById('startRange').focus();
 
@@ -614,21 +616,28 @@ function drawBackground() {
   ctx.fillStyle = 'yellow';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  // horizontal lines
+  const nulline = map(0, lowestUse, highestUse, canvas.height, 0);
+  ctx.beginPath();
+  ctx.moveTo(0, nulline);
+  ctx.lineTo(canvas.width, nulline);
+  ctx.stroke();
+  //vertical lines
   const step = canvas.height/10;
   for(vgrid = canvas.height - step; vgrid >= 0 + step; vgrid -= step){
     ctx.beginPath();
     ctx.moveTo(0, vgrid);
-    ctx.lineTo(1440, vgrid);
+    ctx.lineTo(canvas.width, vgrid);
     ctx.stroke();
-    const wattage = map(vgrid, canvas.height, 0, 0, currentRange).toString();
+    const wattage = map(vgrid, canvas.height, 0, lowestUse, highestUse).toString();
     ctx.fillText(wattage, 60, vgrid);
-    ctx.fillText(wattage, 1440 >> 1, vgrid);
-    ctx.fillText(wattage, 1440 - 60, vgrid);
+    ctx.fillText(wattage, canvas.width >> 1, vgrid); // half-width
+    ctx.fillText(wattage, canvas.width - 60, vgrid); // end
   }
   ctx.fillStyle = 'lightblue'
   ctx.strokeStyle = 'lightblue';
   for(h = 1;h < 24; h++){
-    const xpos = map(h,0,24,0,1440);
+    const xpos = map(h,0,24,0,canvas.width);
     ctx.beginPath();
     ctx.lineWidth = .7;
     ctx.moveTo(xpos, 0);
@@ -639,8 +648,9 @@ function drawBackground() {
   }
 }
 
-function drawGraphItem(item, toCompareCanvas){
+function getExtremes(item) {
   if (!item) return;
+  if (item.startsWith('#')) return;
   const itemdata = item.split(' ');
   const tm = new Date(parseInt(itemdata[0]) * 1000);
   const currentUse = parseInt(itemdata[1]);
@@ -652,28 +662,39 @@ function drawGraphItem(item, toCompareCanvas){
     highestUse = currentUse;
     hightime = tm;
   }
+}
+
+function drawGraphItem(item, toCompareCanvas){
+  if (!item) return;
+  const itemdata = item.split(' ');
+  const tm = new Date(parseInt(itemdata[0]) * 1000);
+  const currentUse = parseInt(itemdata[1]);
   const secondstoday = tm.getSeconds() + tm.getMinutes() * 60 + tm.getHours() * 3600;
-  const xpos = map(secondstoday - 30, 0, 86400, 0, 1440);
   const canvas = document.getElementById(toCompareCanvas ? 'compareGraph' : 'dayGraph');
+  const xpos = map(secondstoday - 30, 0, 86400, 0, canvas.width);
   const ctx = canvas.getContext('2d');
   ctx.beginPath();
   ctx.lineWidth = 1;
   ctx.strokeStyle = toCompareCanvas ? compareColor : 'white';
   ctx.moveTo(xpos, canvas.height);
-  const ypos = map(currentUse, 0, currentRange, canvas.height, 0);
+  const ypos = map(currentUse, lowestUse, highestUse, canvas.height, 0);
   ctx.lineTo(xpos, ypos);
   ctx.stroke();
 }
 
 function drawGraph(rawdata, toCompareCanvas){
   if (!rawdata) return;
+  //raw (file) data always starts with a '#' which if it is the first item in the first line of the file can be discarded - it is the lastreboottime
+  if (rawdata.startsWith("#")) rawdata = rawdata.substring(rawdata.indexOf('\n') + 1);
+  rawdata.split('\n').forEach(function(item){
+    getExtremes(item);
+  });
+  drawBackground();
   const canvas = document.getElementById(toCompareCanvas ? 'compareGraph' : 'dayGraph');
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.lineWidth = 2;
   ctx.setLineDash([]);
-  //raw (file) data always starts with a '#' which if it is the first item in the first line of the file can be discarded - it is the lastreboottime
-  if (rawdata.startsWith("#")) rawdata = rawdata.substring(rawdata.indexOf('\n') + 1);
   //extract the date
   if (!toCompareCanvas) {
     const date = parseInt(rawdata.substring(0,rawdata.indexOf(' ')));
@@ -683,7 +704,7 @@ function drawGraph(rawdata, toCompareCanvas){
     if (!toCompareCanvas && item.startsWith('#')) {
       const tm = new Date(parseInt(item.substring(1, item.indexOf(" "))) * 1000);
       const reboottime = tm.getSeconds() + tm.getMinutes() * 60 + tm.getHours() * 3600;
-      const xpos = map(reboottime, 0, 86400, 0, 1440);
+      const xpos = map(reboottime, 0, 86400, 0, canvas.width);
       ctx.beginPath();
       ctx.lineWidth = 2;
       ctx.strokeStyle = "red";
@@ -694,10 +715,12 @@ function drawGraph(rawdata, toCompareCanvas){
     } else
       drawGraphItem(item, toCompareCanvas);
   });
-  if (!toCompareCanvas) updateFooter();
-  lowestUse = 1000000;
-  highestUse = 0;
-  reboots = 0;
+  if (!toCompareCanvas) {
+    updateFooter();
+  }
+    lowestUse = 1000000;
+    highestUse = 0;
+    reboots = 0;
   document.getElementById("feedbackmsg").style.display = 'none';
 };
 </script>

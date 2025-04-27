@@ -1,21 +1,34 @@
 /*
  * BOARD TTGO T7 V1.3  mini32
  */
-#include <SD.h>
-//#include <FS.h>
+#include <SD.h>                /*@3.2.0*/
+//#include <FS.h>              /*@3.2.0*/
 #include <driver/uart.h>
-#include <AsyncTCP.h>          /* https://github.com/me-no-dev/AsyncTCP */
-#include <ESPAsyncWebServer.h> /* https://github.com/me-no-dev/ESPAsyncWebServer */
-#include <WebSocketsClient.h>  /* https://github.com/Links2004/arduinoWebSockets */
-#include <dsmr.h>              /* https://github.com/matthijskooijman/arduino-dsmr */
+#include <AsyncTCP.h>          /* https://github.com/me-no-dev/AsyncTCP @1.1.4*/
+#include <ESPAsyncWebServer.h> /* https://github.com/me-no-dev/ESPAsyncWebServer @2.9.4 by ESP32Async*/
+#include <WebSocketsClient.h>  /* https://github.com/Links2004/arduinoWebSockets @2.6.1*/
+#include <dsmr.h>              /* https://github.com/matthijskooijman/arduino-dsmr @0.1*/
 #include <esp32-hal-log.h>
-
+/*
+Using library SD at version 3.2.0 in folder: ~/.arduino15/packages/esp32/hardware/esp32/3.2.0/libraries/SD 
+Using library FS at version 3.2.0 in folder: ~/.arduino15/packages/esp32/hardware/esp32/3.2.0/libraries/FS 
+Using library SPI at version 3.2.0 in folder: ~/.arduino15/packages/esp32/hardware/esp32/3.2.0/libraries/SPI 
+Using library Async TCP at version 3.3.2 in folder: ~/Downloads/projects/Arduino/libraries/Async_TCP 
+Using library ESP Async WebServer at version 3.6.2 in folder: ~/Downloads/projects/Arduino/libraries/ESP_Async_WebServer 
+Using library WiFi at version 3.2.0 in folder: ~/.arduino15/packages/esp32/hardware/esp32/3.2.0/libraries/WiFi 
+Using library Networking at version 3.2.0 in folder: ~/.arduino15/packages/esp32/hardware/esp32/3.2.0/libraries/Network 
+Using library WebSockets at version 2.6.1 in folder: ~/Downloads/projects/Arduino/libraries/WebSockets 
+Using library NetworkClientSecure at version 3.2.0 in folder: ~/.arduino15/packages/esp32/hardware/esp32/3.2.0/libraries/NetworkClientSecure 
+Using library Dsmr at version 0.1 in folder: ~/Downloads/projects/Arduino/libraries/arduino-dsmr 
+Using library ESP8266 and ESP32 OLED driver for SSD1306 displays at version 4.6.1 in folder: ~/Downloads/projects/Arduino/libraries/ESP8266_and_ESP32_OLED_driver_for_SSD1306_displays 
+Using library Wire at version 3.2.0 in folder: ~/.arduino15/packages/esp32/hardware/esp32/3.2.0/libraries/Wire 
+*/
 #include "setup.h"
 #include "index_htm_gz.h"
 #include "dagelijks_htm_gz.h"
 
 #if defined(SH1106_OLED)
-#include <SH1106.h> /* Install via 'Manage Libraries' in Arduino IDE -> https://github.com/ThingPulse/esp8266-oled-ssd1306 */
+#include <SH1106.h> /* Install via 'Manage Libraries' in Arduino IDE -> https://github.com/ThingPulse/esp8266-oled-ssd1306 @4.6.1 */
 #else
 #include <SSD1306.h> /* In same library as SH1106 */
 #endif
@@ -68,7 +81,7 @@ void updateFileHandlers(const tm& now) {
     http_server.removeHandler(currentLogFileHandler);
     currentLogFileHandler = &http_server.on(path, HTTP_GET, [](AsyncWebServerRequest* const request) {
         if (!SD.exists(path)) return request->send(404);
-        AsyncWebServerResponse* const response = request->beginResponse(SD, path);
+        AsyncWebServerResponse* const response = request->beginResponse(SD, path, asyncsrv::empty);
         response->addHeader(CACHE_CONTROL_HEADER, CACHE_CONTROL_NOCACHE);
         request->send(response);
         log_d("Request for current logfile");
@@ -273,7 +286,7 @@ void setup() {
     Serial.printf("saving average use every %i minutes\n", SAVE_TIME_MIN);
 }
 
-static uint32_t average{ 0 };
+static int32_t average{ 0 };
 static uint32_t numberOfSamples{ 0 };
 struct {
     uint32_t low;
@@ -285,47 +298,35 @@ struct {
 } currentDTO;
 
 void saveAverage(const tm& timeinfo) {
-    const String message{
-        String(time(NULL)) + " " + String(average / numberOfSamples)
-    };
-
+    String message(time(NULL));
+    if (average >= 0){
+      message += " " + String(average / numberOfSamples);
+    } else {
+      message += " -" + String((-average) / numberOfSamples);
+    }
     ws_server_events.textAll("electric_saved\n" + message);
-
     String path{ '/' + String(timeinfo.tm_year + 1900) }; /* add the current year to the path */
-
     File folder = SD.open(path);
     if (!folder && !SD.mkdir(path)) {
         log_e("could not create folder %s", path);
     }
-
     path.concat("/" + String(timeinfo.tm_mon + 1)); /* add the current month to the path */
-
     folder = SD.open(path);
     if (!folder && !SD.mkdir(path)) {
         log_e("could not create folder %s", path);
     }
-
     path.concat("/" + String(timeinfo.tm_mday) + ".log"); /* add the filename to the path */
-
     static bool booted{ true };
-
     const String current { String(currentDTO.low) + " " + currentDTO.high + " " + currentDTO.gas + " " + currentDTO.rlow + " " + currentDTO.rhigh + " " + currentDTO.voltage};
-
     if (booted || !SD.exists(path)) {
         const String startHeader{ "#" + String(bootTime) + " " + current };
-
         log_d("writing start header '%s' to '%s'", startHeader.c_str(), path.c_str());
-
         appendToFile(path.c_str(), startHeader.c_str());
         booted = false;
     }
-
     log_d("%i samples - saving '%s' to file '%s'", numberOfSamples, message.c_str(), path.c_str());
-
     const String msg { message + " " + current };
-
     appendToFile(path.c_str(), msg.c_str());
-
     average = 0;
     numberOfSamples = 0;
 }
@@ -522,6 +523,7 @@ void process(const char* telegram, const int size) {
     }
 
     average += data.power_delivered.int_val();
+    average -= data.power_returned.int_val();
     numberOfSamples++;
 
     snprintf(currentUseString, sizeof(currentUseString), "current\n%i\n%i\n%i\n%i\n%i\n%i\n%i\n%s\n%i\n%i\n%i\n%i\n%i",
@@ -573,7 +575,7 @@ void process(const char* telegram, const int size) {
         uint32_t delivered = data.power_delivered.int_val();
         uint32_t returned = data.power_returned.int_val();
         oled.setFont(ArialMT_Plain_16);
-        if (delivered > returned) {
+        if (delivered >= returned) {
         oled.drawString(xOrigin, yOrigin+yOffset+yOffset, String(delivered - returned) + "W");
         } else {
         oled.drawString(xOrigin, yOrigin+yOffset+yOffset, "-" +String(returned - delivered) + "W");

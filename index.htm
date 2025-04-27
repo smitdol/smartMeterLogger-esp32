@@ -34,8 +34,19 @@ body{
                                   supported by Chrome and Opera */
 }
 
-.container{
+.container5{
+  width: 100%;
   margin:0 0 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  grid-gap: 1px;
+}
+.container2{
+  width: 100%;
+  margin:0 0 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-gap: 1px;
 }
 .info{
   margin:0;
@@ -67,86 +78,92 @@ a{
   margin:5px;
 }
 .name, .value{
-  width:40%;
   display:inline-block;
   margin:2px 5px;
+  text-overflow: clip;
 }
 .name3, .value3{
-  width:18%;
   display:inline-block;
   margin:2px 5px;
+  text-overflow: clip;
 }
 .kWh{
-  width:8%;
   display:inline-block;
   margin:2px 5px;
   text-align:left;
 }
-.name, name3{
+.name, .name3{
   text-align:right;
 }
-.value,value3{
+.value, .value3{
   text-align:left;
 }
 </style>
 </head>
 <body class="noselect">
 <div id="topmenu">
-  <span id="title">slimme meter</span><a href="/daggrafiek">vandaag</a>
+<span id="title">slimme meter</span><a href="/daggrafiek" id="nu1">vandaag</a>
 </div>
-<p class="info">nu</p>
-<div class="container">
-  <p class="name">verbruik:</p><p id="currentUse" class="value"></p>
-  <p class="name">tarief:</p><p id="tariff" class="value"></p>
+<div class="container2">
+<p class="name">verbruik:</p><p id="currentUse" class="value"></p>
+<p class="name">tarief:</p><p id="tariff" class="value"></p>
 </div>
-<p class="info">vandaag</p>
-<div class="container">
-  <p class="name3">electra</p>
+<div class="container5">
+<p class="name3">electra</p>
 <p class="value3">verbruik</p>
 <p class="value3">levering</p>
 <p class="value3">balance</p>
 <p class="kWh">&nbsp;</p>
-  <p class="name3">laag:</p>
+<p class="name3">laag:</p>
 <p id="lowToday" class="value3"></p>
 <p id="lowrToday" class="value3"></p>
 <p id="balanceLowToday" class="value3"></p>
 <p class="kWh">kWh</p>
-  <p class="name3">hoog:</p>
+<p class="name3">hoog:</p>
 <p id="highToday" class="value3"></p>
 <p id="highrToday" class="value3"></p>
 <p id="balanceHighToday" class="value3"></p>
 <p class="kWh">kWh</p>
-  <p class="name3">totaal:</p>
-<p id="total_tUse" class="value3">
-</p><p id="total_rToday" class="value3"></p>
+<p class="name3">totaal:</p>
+<p id="total_tUse" class="value3"></p>
+<p id="total_rToday" class="value3"></p>
 <p id="balanceToday" class="value3"></p>
 <p class="kWh">kWh</p>
-  <p class="name">gas:</p><p id="gasToday" class="value"></p>
+<p class="name3">gas:</p>
+<p id="gasToday" class="value3"></p>
+<p class="name3">&nbsp;</p>
+<p class="name3">&nbsp;</p>
+<p class="kWh">m³</p>
 </div>
-<p class="info">totaal</p>
-<div class="container">
-  <p class="name3">electra</p>
+<div class="container2">
+<p class="name">totaal:</p><p id="nu2" class="value"></p>
+</div>
+<div class="container5">
+<p class="name3">electra</p>
 <p class="value3">verbruik</p>
 <p class="value3">levering</p>
 <p class="value3">balance</p>
 <p class="kWh">&nbsp;</p>
-  <p class="name3">laag:</p>
+<p class="name3">laag:</p>
 <p id="lowUse" class="value3"></p>
 <p id="lowrUse" class="value3"></p>
 <p id="balanceLow" class="value3"></p>
 <p class="kWh">kWh</p>
-  <p class="name3">hoog:</p>
+<p class="name3">hoog:</p>
 <p id="highUse" class="value3"></p>
 <p id="highrUse" class="value3"></p>
 <p id="balanceHigh" class="value3"></p>
 <p class="kWh">kWh</p>
-  <p class="name3">totaal:</p>
+<p class="name3">totaal:</p>
 <p id="total_eUse" class="value3"></p>
 <p id="total_rUse" class="value3"></p>
 <p id="balance" class="value3"></p>
 <p class="kWh">kWh</p>
-  <p class="name">gas:</p>
-<p id="gasUse" class="value"></p>
+<p class="name3">gas:</p>
+<p id="gasUse" class="value3"></p>
+<p class="value3">&nbsp;</p>
+<p class="value3">&nbsp;</p>
+<p class="kWh">m³</p>
 </div>
 <script>
 const http_protocol = window.location.protocol !== 'https:' ? 'http://' : 'https://';
@@ -171,28 +188,31 @@ ready(event => {
     } else {
         document.getElementById('currentUse').innerHTML   = dsmr[0] + " W";
     }
-    document.getElementById('lowUse').innerHTML       =  (dsmr[1] / 1000.0).toFixed(1).replace(".", ",") ;
-    document.getElementById('highUse').innerHTML      =  (dsmr[2] / 1000.0).toFixed(1).replace(".", ",") ;
-    document.getElementById('gasUse').innerHTML       =  (dsmr[3] / 1000.0).toFixed(1).replace(".", ",") + ' m³';
+    document.getElementById('lowUse').innerHTML       =  (dsmr[1] / 1000.0).toFixed(3).replace(".", ",") ;
+    document.getElementById('highUse').innerHTML      =  (dsmr[2] / 1000.0).toFixed(3).replace(".", ",") ;
+    document.getElementById('gasUse').innerHTML       =  (dsmr[3] / 1000.0).toFixed(3).replace(".", ",") ;
     document.getElementById('lowToday').innerHTML     =  (dsmr[4] / 1000.0).toFixed(3).replace(".", ",") ;
     document.getElementById('highToday').innerHTML    =  (dsmr[5] / 1000.0).toFixed(3).replace(".", ",") ;
-    document.getElementById('gasToday').innerHTML     =  (dsmr[6] / 1000.0).toFixed(3).replace(".", ",") + ' m³';
+    document.getElementById('gasToday').innerHTML     =  (dsmr[6] / 1000.0).toFixed(3).replace(".", ",") ;
     document.getElementById('tariff').innerHTML       =   dsmr[7];
-    document.getElementById('total_eUse').innerHTML   = ((dsmr[1] / 1000.0 + dsmr[2] / 1000.0 )).toFixed(1).replace(".", ",") ;
+    document.getElementById('total_eUse').innerHTML   = ((dsmr[1] / 1000.0 + dsmr[2] / 1000.0 )).toFixed(3).replace(".", ",") ;
     document.getElementById('total_tUse').innerHTML   = ((dsmr[4] / 1000.0 + dsmr[5] / 1000.0 )).toFixed(3).replace(".", ",") ;
 
-    document.getElementById('lowrUse').innerHTML      =  (dsmr[8]  / 1000.0).toFixed(1).replace(".", ",") ;
-    document.getElementById('highrUse').innerHTML     =  (dsmr[9]  / 1000.0).toFixed(1).replace(".", ",") ;
+    document.getElementById('lowrUse').innerHTML      =  (dsmr[8]  / 1000.0).toFixed(3).replace(".", ",") ;
+    document.getElementById('highrUse').innerHTML     =  (dsmr[9]  / 1000.0).toFixed(3).replace(".", ",") ;
     document.getElementById('lowrToday').innerHTML    =  (dsmr[10] / 1000.0).toFixed(3).replace(".", ",") ;
     document.getElementById('highrToday').innerHTML   =  (dsmr[11] / 1000.0).toFixed(3).replace(".", ",") ;
     document.getElementById('total_rToday').innerHTML = ((dsmr[10] / 1000.0 + dsmr[11] / 1000.0 )).toFixed(3).replace(".", ",") ;
-    document.getElementById('total_rUse').innerHTML   = ((dsmr[8] / 1000.0 + dsmr[9] / 1000.0 )).toFixed(1).replace(".", ",") ;
-    document.getElementById('balanceLow').innerHTML   = ((dsmr[1] / 1000.0 - dsmr[8] / 1000.0 )).toFixed(1).replace(".", ",") ;
-    document.getElementById('balanceHigh').innerHTML   = ((dsmr[2] / 1000.0 - dsmr[9] /1000.0 )).toFixed(1).replace(".", ",") ;
-    document.getElementById('balance').innerHTML   = ((dsmr[1] / 1000.0 + dsmr[2] / 1000.0 - dsmr[8] / 1000.0 - dsmr[9] / 1000.0 )).toFixed(1).replace(".", ",") ;
+    document.getElementById('total_rUse').innerHTML   = ((dsmr[8] / 1000.0 + dsmr[9] / 1000.0 )).toFixed(3).replace(".", ",") ;
+    document.getElementById('balanceLow').innerHTML   = ((dsmr[1] / 1000.0 - dsmr[8] / 1000.0 )).toFixed(3).replace(".", ",") ;
+    document.getElementById('balanceHigh').innerHTML   = ((dsmr[2] / 1000.0 - dsmr[9] /1000.0 )).toFixed(3).replace(".", ",") ;
+    document.getElementById('balance').innerHTML   = ((dsmr[1] / 1000.0 + dsmr[2] / 1000.0 - dsmr[8] / 1000.0 - dsmr[9] / 1000.0 )).toFixed(3).replace(".", ",") ;
     document.getElementById('balanceLowToday').innerHTML   = ((dsmr[4] / 1000.0 - dsmr[10] / 1000.0 )).toFixed(3).replace(".", ",") ;
     document.getElementById('balanceHighToday').innerHTML   = ((dsmr[5] / 1000.0 - dsmr[11] / 1000.0 )).toFixed(3).replace(".", ",");
     document.getElementById('balanceToday').innerHTML   = ((dsmr[4] / 1000.0 + dsmr[5] / 1000.0 - dsmr[10] / 1000.0 - dsmr[11] / 1000.0 )).toFixed(3).replace(".", ",") ;
+    const date =new Date().toLocaleDateString('nl-NL', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour12: false});
+    document.getElementById("nu1").innerHTML = date;
+    document.getElementById("nu2").innerHTML = date;
   };
   ws.onopen = function(){console.log('[WebSocket] Connected to ' + ws_host);}
   ws.onclose = function(event){console.log('[WebSocket] Connection died, code='  + event.code + ' reason=' + event.reason);}
